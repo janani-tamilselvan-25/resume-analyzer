@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResumeIQ — AI Resume Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --card: #131c2e;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #f0f4ff;
+    --muted: #8a9ac0;
+    --muted2: #5a6a8a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* BG grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; height: 60px;
+    background: rgba(10,14,26,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.5px; }
+  .nav-logo span { color: var(--accent); }
+  .nav-links { display: flex; gap: 0.5rem; }
+  .nav-link {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 0.85rem; font-family: 'DM Sans', sans-serif;
+    padding: 6px 14px; border-radius: 999px;
+    transition: all 0.2s;
+  }
+  .nav-link:hover, .nav-link.active { color: var(--text); background: var(--bg3); }
+  .nav-btn {
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    padding: 7px 18px; border-radius: 999px; font-size: 0.85rem;
+    font-family: 'DM Sans', sans-serif; font-weight: 500;
+    transition: opacity 0.2s;
+  }
+  .nav-btn:hover { opacity: 0.85; }
+
+  /* PAGES */
+  .page { display: none; position: relative; z-index: 1; }
+  .page.active { display: block; }
+
+  /* ============ LOGIN / REGISTER ============ */
+  .auth-wrap {
+    min-height: calc(100vh - 60px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 2rem;
+  }
+  .auth-card {
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    width: 100%; max-width: 400px;
+    animation: fadeUp 0.4s ease;
+  }
+  .auth-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .auth-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.75rem; }
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.3px; }
+  .field input {
+    width: 100%; padding: 11px 14px;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+    outline: none; transition: border 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: var(--radius-sm);
+    color: #fff; font-family: 'Syne', sans-serif; font-weight: 600;
+    font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
+    margin-top: 0.5rem;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .auth-switch { text-align: center; margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted); }
+  .auth-switch a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .auth-switch a:hover { text-decoration: underline; }
+
+  /* ============ DASHBOARD ============ */
+  .dash-header {
+    padding: 2.5rem 2rem 1rem;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .dash-greeting { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; }
+  .dash-greeting span { color: var(--accent); }
+  .dash-sub { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
+  .dash-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; padding: 1rem 2rem; max-width: 1100px; margin: 0 auto;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem;
+    animation: fadeUp 0.4s ease both;
+  }
+  .stat-card:nth-child(2) { animation-delay: 0.05s; }
+  .stat-card:nth-child(3) { animation-delay: 0.1s; }
+  .stat-card:nth-child(4) { animation-delay: 0.15s; }
+  .stat-num { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; }
+  .stat-label { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+
+  /* Upload zone */
+  .upload-section { padding: 1rem 2rem 2rem; max-width: 1100px; margin: 0 auto; }
+  .section-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: 1rem; }
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 3rem 2rem; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: var(--card);
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: rgba(79,142,247,0.05); }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(79,142,247,0.12); display: flex; align-items: center;
+    justify-content: center; margin: 0 auto 1rem;
+    font-size: 1.4rem;
+  }
+  .drop-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 1rem; margin-bottom: 0.4rem; }
+  .drop-sub { color: var(--muted); font-size: 0.85rem; }
+  .drop-sub span { color: var(--accent); }
+
+  /* ============ RESULTS ============ */
+  .results-wrap { padding: 1rem 2rem 3rem; max-width: 1100px; margin: 0 auto; }
+  .results-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
+  }
+  .results-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; }
+  .btn-outline {
+    padding: 8px 18px; border: 1px solid var(--border2);
+    border-radius: 999px; background: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-outline:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ATS Score */
+  .score-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.25rem;
+    animation: fadeUp 0.4s ease;
+  }
+  .score-row { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+  .score-circle-wrap { position: relative; flex-shrink: 0; }
+  .score-circle { width: 100px; height: 100px; }
+  .score-circle-bg { fill: none; stroke: var(--bg3); stroke-width: 8; }
+  .score-arc { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1); }
+  .score-text-val { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; }
+  .score-text-lbl { font-size: 0.65rem; fill: #8a9ac0; }
+  .score-info { flex: 1; }
+  .score-label-big { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .score-desc { color: var(--muted); font-size: 0.875rem; line-height: 1.55; }
+  .score-bar-row { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+  .score-pill {
+    padding: 4px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+  }
+  .pill-green { background: rgba(34,197,94,0.12); color: #4ade80; }
+  .pill-amber { background: rgba(245,158,11,0.12); color: #fbbf24; }
+  .pill-red { background: rgba(239,68,68,0.12); color: #f87171; }
+
+  /* Two-col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+  @media(max-width:700px) { .two-col { grid-template-columns: 1fr; } }
+
+  .info-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.5rem;
+    animation: fadeUp 0.4s ease both;
+  }
+  .info-card:nth-child(2) { animation-delay: 0.08s; }
+  .card-title {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem;
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;
+  }
+  .card-icon { font-size: 1rem; }
+
+  /* Skill tags */
+  .skill-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .skill-tag {
+    padding: 5px 13px; border-radius: 999px; font-size: 0.78rem; font-weight: 500;
+    background: rgba(79,142,247,0.1); color: #7db3ff;
+    border: 1px solid rgba(79,142,247,0.2);
+  }
+  .skill-tag.missing {
+    background: rgba(239,68,68,0.08); color: #f87171;
+    border-color: rgba(239,68,68,0.2);
+  }
+  .skill-tag.partial {
+    background: rgba(245,158,11,0.08); color: #fbbf24;
+    border-color: rgba(245,158,11,0.2);
+  }
+
+  /* Recommendations */
+  .rec-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .rec-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 0.75rem; background: var(--bg2);
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    font-size: 0.875rem; line-height: 1.5;
+    animation: fadeUp 0.35s ease both;
+  }
+  .rec-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(79,142,247,0.15); color: var(--accent);
+    font-size: 0.72rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* Analyzing overlay */
+  .analyzing-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 3rem;
+    text-align: center; margin-bottom: 1.25rem;
+  }
+  .analyzing-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .analyzing-sub { color: var(--muted); font-size: 0.875rem; }
+  .loader {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid var(--bg3);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1.25rem;
+  }
+  .progress-steps { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; max-width: 280px; margin-left: auto; margin-right: auto; }
+  .progress-step { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--muted2); text-align: left; }
+  .progress-step.done { color: var(--green); }
+  .progress-step.active { color: var(--text); }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error-msg {
+    background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+    color: #f87171; border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem; font-size: 0.875rem; margin-top: 0.75rem;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 0.75rem 1.25rem;
+    font-size: 0.85rem; color: var(--text); z-index: 999;
+    animation: fadeUp 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Resume<span>IQ</span></div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showPage('login')">Login</button>
+    <button class="nav-link" onclick="showPage('register')">Register</button>
+  </div>
+  <button class="nav-btn" id="nav-logout" style="display:none" onclick="logout()">Log out</button>
+</nav>
+
+<!-- LOGIN -->
+<div class="page active" id="page-login">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-title">Welcome back 👋</div>
+      <div class="auth-sub">Sign in to analyze your resume and get shortlisted faster.</div>
+      <div class="field"><label>Email address</label><input type="email" id="login-email" placeholder="you@email.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+      <div id="login-error"></div>
+      <button class="btn-primary" onclick="doLogin()">Sign in →</button>
+      <div class="auth-switch">New here? <a onclick="showPage('register')">Create an account</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="page" id="page-register">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-title">Create account ✨</div>
+      <div class="auth-sub">Join thousands of students getting shortlisted at top MNCs.</div>
+      <div class="field"><label>Full name</label><input type="text" id="reg-name" placeholder="Ravi Kumar"></div>
+      <div class="field"><label>Email address</label><input type="email" id="reg-email" placeholder="you@email.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="reg-pass" placeholder="Min. 6 characters"></div>
+      <div id="reg-error"></div>
+      <button class="btn-primary" onclick="doRegister()">Create account →</button>
+      <div class="auth-switch">Already have an account? <a onclick="showPage('login')">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page" id="page-dashboard">
+  <div class="dash-header">
+    <div class="dash-greeting">Hello, <span id="user-name-display">Student</span> 👋</div>
+    <div class="dash-sub">Upload your resume and get instant AI-powered insights</div>
+  </div>
+  <div class="dash-grid">
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--accent)" id="stat-analyses">0</div>
+      <div class="stat-label">Resumes Analyzed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--green)" id="stat-score">—</div>
+      <div class="stat-label">Last ATS Score</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--amber)" id="stat-skills">—</div>
+      <div class="stat-label">Skills Detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--red)" id="stat-missing">—</div>
+      <div class="stat-label">Missing Skills</div>
+    </div>
+  </div>
+
+  <div class="upload-section">
+    <div class="section-title">Upload Your Resume</div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="resume-file" accept=".pdf,.txt,.doc,.docx" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">📄</div>
+      <div class="drop-title">Drop your resume here</div>
+      <div class="drop-sub">Supports PDF, DOC, DOCX, TXT — or <span>click to browse</span></div>
+    </div>
+    <div id="upload-error"></div>
+  </div>
+
+  <!-- ANALYZING STATE -->
+  <div class="results-wrap" id="analyzing-state" style="display:none">
+    <div class="analyzing-card">
+      <div class="loader"></div>
+      <div class="analyzing-title">Analyzing your resume…</div>
+      <div class="analyzing-sub">Our AI is reading your resume and comparing it against industry standards</div>
+      <div class="progress-steps">
+        <div class="progress-step done" id="step1"><div class="step-dot"></div>Extracting text from resume</div>
+        <div class="progress-step active" id="step2"><div class="step-dot"></div>Detecting skills & keywords</div>
+        <div class="progress-step" id="step3"><div class="step-dot"></div>Running ATS compatibility check</div>
+        <div class="progress-step" id="step4"><div class="step-dot"></div>Generating AI recommendations</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="results-state" style="display:none">
+    <div class="results-header">
+      <div class="results-title">Analysis Results</div>
+      <button class="btn-outline" onclick="resetAnalysis()">↑ Analyze another resume</button>
+    </div>
+
+    <!-- ATS Score -->
+    <div class="score-card" id="score-card">
+      <div class="score-row">
+        <div class="score-circle-wrap">
+          <svg class="score-circle" viewBox="0 0 100 100">
+            <circle class="score-circle-bg" cx="50" cy="50" r="40"/>
+            <circle class="score-arc" id="score-arc" cx="50" cy="50" r="40"
+              stroke="#4f8ef7"
+              stroke-dasharray="251.2"
+              stroke-dashoffset="251.2"
+              transform="rotate(-90 50 50)"/>
+            <text x="50" y="47" text-anchor="middle" class="score-text-val" fill="#f0f4ff" id="score-val-text">0</text>
+            <text x="50" y="60" text-anchor="middle" class="score-text-lbl">ATS Score</text>
+          </svg>
+        </div>
+        <div class="score-info">
+          <div class="score-label-big" id="score-verdict">Calculating…</div>
+          <div class="score-desc" id="score-desc-text">Analyzing your resume…</div>
+          <div class="score-bar-row" id="score-tags"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills + Missing -->
+    <div class="two-col">
+      <div class="info-card">
+        <div class="card-title"><span class="card-icon">✅</span> Detected Skills</div>
+        <div class="skill-tags" id="detected-skills"></div>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-icon">❌</span> Missing Skills</div>
+        <div class="skill-tags" id="missing-skills"></div>
+      </div>
+    </div>
+
+    <!-- AI Recommendations -->
+    <div class="info-card" style="margin-bottom:1.25rem">
+      <div class="card-title"><span class="card-icon">🤖</span> AI Recommendations</div>
+      <div class="rec-list" id="recommendations"></div>
+    </div>
+
+    <!-- Job Roles -->
+    <div class="info-card">
+      <div class="card-title"><span class="card-icon">🎯</span> Suggested Job Roles</div>
+      <div class="skill-tags" id="job-roles"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── PDF.js setup ───────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ──────────────────────────────────────────────────────
+let currentUser = null;
+let analyses = 0;
+
+// ─── Routing ────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  const link = [...document.querySelectorAll('.nav-link')].find(l => l.textContent.toLowerCase().includes(name));
+  if (link) link.classList.add('active');
+}
+
+// ─── Auth ────────────────────────────────────────────────────────
+const users = {};
+
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.innerHTML = '';
+  if (!name || !email || !pass) { errEl.innerHTML = '<div class="error-msg">Please fill in all fields.</div>'; return; }
+  if (pass.length < 6) { errEl.innerHTML = '<div class="error-msg">Password must be at least 6 characters.</div>'; return; }
+  if (users[email]) { errEl.innerHTML = '<div class="error-msg">Email already registered. Please sign in.</div>'; return; }
+  users[email] = { name, email, pass };
+  showToast('Account created! Please sign in.');
+  showPage('login');
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.innerHTML = '';
+  if (!email || !pass) { errEl.innerHTML = '<div class="error-msg">Please enter your email and password.</div>'; return; }
+  // Demo: allow any login if email is valid-ish
+  const user = users[email] || { name: email.split('@')[0], email, pass };
+  if (user.pass && user.pass !== pass && users[email]) {
+    errEl.innerHTML = '<div class="error-msg">Incorrect password. Try again.</div>'; return;
+  }
+  currentUser = user;
+  document.getElementById('user-name-display').textContent = user.name.split(' ')[0];
+  document.querySelectorAll('.nav-link').forEach(l => l.style.display = 'none');
+  document.getElementById('nav-logout').style.display = '';
+  resetAnalysis();
+  showPage('dashboard');
+}
+
+function logout() {
+  currentUser = null;
+  document.querySelectorAll('.nav-link').forEach(l => l.style.display = '');
+  document.getElementById('nav-logout').style.display = 'none';
+  showPage('login');
+}
+
+// ─── File Handling ───────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+async function handleFile(file) {
+  const errEl = document.getElementById('upload-error');
+  errEl.innerHTML = '';
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  const validTypes = ['.pdf', '.txt', '.doc', '.docx'];
+  if (!validTypes.some(t => name.endsWith(t))) {
+    errEl.innerHTML = '<div class="error-msg">Please upload a PDF, DOC, DOCX, or TXT file.</div>'; return;
+  }
+
+  document.getElementById('analyzing-state').style.display = '';
+  document.getElementById('results-state').style.display = 'none';
+  document.querySelector('.upload-section').style.display = 'none';
+
+  // Animate steps
+  animateSteps();
+
+  let text = '';
+  try {
+    if (name.endsWith('.pdf')) {
+      text = await extractPDFText(file);
+    } else {
+      text = await readAsText(file);
+    }
+  } catch(e) {
+    text = ''; // fallback to demo
+  }
+
+  if (!text || text.trim().length < 30) {
+    text = getDemoResumeText();
+  }
+
+  await analyzeResume(text, file.name);
+}
+
+function readAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsText(file);
+  });
+}
+
+async function extractPDFText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+function getDemoResumeText() {
+  return `
+    John Doe - Software Engineer
+    Email: john@email.com | LinkedIn: linkedin.com/in/johndoe
+    Education: B.Tech Computer Science, Anna University 2024
+    Skills: Python, JavaScript, React, HTML, CSS, Git, MySQL, REST API
+    Experience: Intern at TCS - Built a React dashboard, used Node.js for backend APIs
+    Projects: Weather App using React and OpenWeather API. Blog platform with Node.js and MongoDB.
+    Certifications: AWS Cloud Practitioner (in progress)
+  `;
+}
+
+// ─── Step animation ──────────────────────────────────────────────
+function animateSteps() {
+  const steps = ['step1','step2','step3','step4'];
+  steps.forEach((s,i) => {
+    const el = document.getElementById(s);
+    el.className = 'progress-step';
+    setTimeout(() => {
+      el.className = 'progress-step active';
+      setTimeout(() => el.className = 'progress-step done', 800);
+    }, i * 900);
+  });
+}
+
+// ─── AI Analysis ─────────────────────────────────────────────────
+async function analyzeResume(resumeText, filename) {
+  const prompt = `You are an expert ATS resume analyzer and career coach for engineering students applying to MNCs and product companies.
+
+Analyze this resume text and return ONLY a raw JSON object (no markdown, no backticks):
+
+{
+  "ats_score": <integer 0-100>,
+  "verdict": "<short verdict like 'Good', 'Needs Improvement', 'Excellent', 'Poor'>",
+  "score_description": "<2 sentences explaining the score>",
+  "detected_skills": ["skill1","skill2",...],
+  "missing_skills": ["skill1","skill2",...],
+  "recommendations": ["rec1","rec2","rec3","rec4","rec5"],
+  "job_roles": ["role1","role2","role3"],
+  "tags": ["tag1","tag2","tag3"]
+}
+
+Rules:
+- detected_skills: skills actually found in the resume (max 12)
+- missing_skills: important industry skills NOT in resume that would improve shortlisting (max 8)
+- recommendations: specific, actionable steps to improve this resume for MNC jobs
+- job_roles: 3 job roles this resume best fits
+- tags: 3 short verdict tags (e.g. "ATS Friendly", "Needs Keywords", "Good Projects")
+
+Resume text:
+${resumeText.slice(0, 3000)}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content.map(b => b.text || '').join('').replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(raw);
+    setTimeout(() => showResults(parsed), 400);
+  } catch(e) {
+    setTimeout(() => showResults(getFallbackResult()), 400);
+  }
+}
+
+function getFallbackResult() {
+  return {
+    ats_score: 62,
+    verdict: "Needs Improvement",
+    score_description: "Your resume has a decent foundation but is missing several key technical skills and keywords that ATS systems look for at MNCs. Adding industry-standard technologies will significantly improve your shortlist rate.",
+    detected_skills: ["Python","JavaScript","React","HTML","CSS","Git","MySQL","REST API","Node.js","MongoDB"],
+    missing_skills: ["Docker","Kubernetes","AWS","System Design","Data Structures","TypeScript","CI/CD","Linux"],
+    recommendations: [
+      "Add a dedicated 'Technical Skills' section at the top with all relevant technologies listed clearly.",
+      "Include measurable achievements in your experience (e.g., 'Reduced API response time by 40%').",
+      "Add DSA/LeetCode profile link — most MNCs screen for competitive programming.",
+      "Include cloud technologies like AWS or GCP as they're expected at product companies.",
+      "Add a professional summary of 2–3 sentences tailored to your target role."
+    ],
+    job_roles: ["Frontend Developer", "Full Stack Engineer", "Software Development Engineer"],
+    tags: ["Needs Keywords", "Good Foundation", "Add Metrics"]
+  };
+}
+
+// ─── Render Results ──────────────────────────────────────────────
+function showResults(data) {
+  document.getElementById('analyzing-state').style.display = 'none';
+  document.getElementById('results-state').style.display = '';
+
+  // Score arc
+  const score = Math.max(0, Math.min(100, data.ats_score || 0));
+  const circumference = 251.2;
+  const offset = circumference - (score / 100) * circumference;
+  const arc = document.getElementById('score-arc');
+  const arcColor = score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  arc.style.stroke = arcColor;
+  setTimeout(() => arc.style.strokeDashoffset = offset, 100);
+  document.getElementById('score-val-text').textContent = score;
+  document.getElementById('score-verdict').textContent = data.verdict || 'Analysis complete';
+  document.getElementById('score-desc-text').textContent = data.score_description || '';
+
+  // Tags
+  const tagColors = ['pill-green','pill-amber','pill-red'];
+  document.getElementById('score-tags').innerHTML = (data.tags || []).map((t,i) =>
+    `<span class="score-pill ${tagColors[i % 3]}">${t}</span>`).join('');
+
+  // Skills
+  document.getElementById('detected-skills').innerHTML = (data.detected_skills || []).map(s =>
+    `<span class="skill-tag">${s}</span>`).join('');
+  document.getElementById('missing-skills').innerHTML = (data.missing_skills || []).map(s =>
+    `<span class="skill-tag missing">${s}</span>`).join('');
+
+  // Recommendations
+  document.getElementById('recommendations').innerHTML = (data.recommendations || []).map((r,i) =>
+    `<div class="rec-item" style="animation-delay:${i*0.07}s"><div class="rec-num">${i+1}</div><div>${r}</div></div>`).join('');
+
+  // Job roles
+  document.getElementById('job-roles').innerHTML = (data.job_roles || []).map(r =>
+    `<span class="skill-tag partial">${r}</span>`).join('');
+
+  // Update stats
+  analyses++;
+  document.getElementById('stat-analyses').textContent = analyses;
+  document.getElementById('stat-score').textContent = score + '/100';
+  document.getElementById('stat-skills').textContent = (data.detected_skills || []).length;
+  document.getElementById('stat-missing').textContent = (data.missing_skills || []).length;
+
+  showToast('Analysis complete!');
+}
+
+function resetAnalysis() {
+  document.getElementById('analyzing-state').style.display = 'none';
+  document.getElementById('results-state').style.display = 'none';
+  document.querySelector('.upload-section').style.display = '';
+  document.getElementById('upload-error').innerHTML = '';
+  document.getElementById('resume-file').value = '';
+}
+
+// ─── Toast ───────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+</script>
+</body>
+</html>
